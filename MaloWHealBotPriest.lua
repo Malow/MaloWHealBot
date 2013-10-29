@@ -7,7 +7,6 @@
 -- Flash heal
 -- Instead of having to set options for fort buff if not improved, have some sort of communication between healers where they say if they have improved or not.
 -- Spirit of redemption, if duration left of Spirit of Redemption is less than 2.8 sec only cast renews.
--- OOC, drink if your oom to buff, should happen automatically if spellcast returns fail if oom.
 
 SPELL_GREATER_HEAL = "Greater Heal(Rank 4)";
 SPELL_GREATER_HEAL_DOWNRANKED = "Greater Heal(Rank 1)";
@@ -99,64 +98,82 @@ function mhb_Priest_GetPOHEffect()
 	return effect;
 end
 
+-- Checks if current casting heal should be cancelled. Returns true if it stopped casting
+function mhb_Priest_CheckStopCasting()
+	local missingHealth = mhb_GetMissingHealth(currentTarget);
+	if mhb_IsOnGCDIn(GCD_TIME_LEFT_BEFORE_CANCEL) then
+		 return false; -- Do nothing, not worth interrupting a cast when on GCD, target may take dmg again before GCD is over.
+	elseif currentSpell == SPELL_GREATER_HEAL then
+		if missingHealth < HEALVALUE_GREATER_HEAL * COEF_CANCEL_HEAL then
+			mhb_StopCasting();
+			return true;
+		end
+	elseif currentSpell == SPELL_GREATER_HEAL_DOWNRANKED then
+		if missingHealth < HEALVALUE_GREATER_HEAL_DOWNRANKED * COEF_CANCEL_HEAL then
+			mhb_StopCasting();
+			return true;
+		end
+	elseif currentSpell == SPELL_PRAYER_OF_HEALING then
+		if mhb_Priest_GetPOHEffect() < COEF_PRAYER_OF_HEALING * COEF_CANCEL_HEAL then
+			mhb_StopCasting();
+			return true;
+		end
+	elseif currentSpell == SPELL_HEAL_DOWNRANKED then
+		if missingHealth == 0 then
+			mhb_StopCasting();
+			return true;
+		end
+	end
+	if not mhb_IsStillValidTarget(currentTarget) then
+		mhb_StopCasting();
+		return true;
+	end
+	return false;
+end
+
+-- Finds a new target to heal and starts casting.
+function mhb_Priest_StartNewHeal()
+	-- Power:word shield a target at low health.
+	local shieldTargetUnit, healthOfTarget = mhb_GetLowestHealthTarget(SPELL_POWER_WORD_SHIELD);
+	if healthOfTarget < THRESHOLD_CURRENTHEALTH_POWERWORD_SHIELD and 
+				mhb_GetMissingHealth(shieldTargetUnit) > THRESHOLD_MISSINGHEALTH_POWERWORD_SHIELD and 
+				mhb_Priest_CanCastPWS(shieldTargetUnit) then
+		if mhb_TargetAndCast(shieldTargetUnit, SPELL_POWER_WORD_SHIELD) then return true; end
+	-- Otherwise cast prayer of healing if good choice.
+	elseif mhb_Priest_GetPOHEffect() > COEF_PRAYER_OF_HEALING then
+		if mhb_TargetAndCast("player", SPELL_PRAYER_OF_HEALING) then return true; end
+	-- Otherwise just heal with heals.
+	else
+		local healTargetUnit, missingHealth = mhb_GetMostDamagedTarget(SPELL_GREATER_HEAL);
+		if missingHealth > HEALVALUE_GREATER_HEAL then
+			if mhb_TargetAndCast(healTargetUnit, SPELL_GREATER_HEAL) then return true; end
+		elseif missingHealth > HEALVALUE_GREATER_HEAL_DOWNRANKED then
+			if mhb_TargetAndCast(healTargetUnit, SPELL_GREATER_HEAL_DOWNRANKED) then return true; end
+		elseif missingHealth > 0 then
+			if mhb_TargetAndCast(healTargetUnit, SPELL_HEAL_DOWNRANKED) then return true; end
+		else
+			return false;
+		end
+		-- By now we should be casting if there's a target that needs heals, if we're not we're probably moving, so cast renew instead.
+		if not mhb_IsCasting() and missingHealth > HEALVALUE_RENEW * COEF_RENEW and not mhb_HasBuff(healTargetUnit, BUFF_RENEW) then
+			if mhb_TargetAndCast(healTargetUnit, SPELL_RENEW) then return true;
+		end
+	end
+	return false;
+end
+
 -- Function for healing for priests
 function mhb_Priest_Heal()
-	local isHealing = true;
-	-- If already casting, cancel cast if target has been healed enough already, or if target is no longer valid
+	-- If already casting, cancel cast if target has been healed enough already, or if target is no longer valid, after that start a new heal.
 	if mhb_IsCasting() then
-		local missingHealth = mhb_GetMissingHealth(currentTarget);
-		if mhb_IsOnGCDIn(GCD_TIME_LEFT_BEFORE_CANCEL) then
-			 return; -- Do nothing, not worth interrupting a cast when on GCD, target may take dmg again before GCD is over.
-		elseif currentSpell == SPELL_GREATER_HEAL then
-			if missingHealth < HEALVALUE_GREATER_HEAL * COEF_CANCEL_HEAL then
-				mhb_StopCasting();
-			end
-		elseif currentSpell == SPELL_GREATER_HEAL_DOWNRANKED then
-			if missingHealth < HEALVALUE_GREATER_HEAL_DOWNRANKED * COEF_CANCEL_HEAL then
-				mhb_StopCasting();
-			end
-		elseif currentSpell == SPELL_PRAYER_OF_HEALING then
-			if mhb_Priest_GetPOHEffect() < COEF_PRAYER_OF_HEALING * COEF_CANCEL_HEAL then
-				mhb_StopCasting();
-			end
-		elseif currentSpell == SPELL_HEAL_DOWNRANKED then
-			if missingHealth == 0 then
-				mhb_StopCasting();
-			end
-		end
-		if not mhb_IsStillValidTarget(currentTarget) then
-			mhb_StopCasting();
+		if mhb_Priest_CheckStopCasting() then
+			if mhb_Priest_StartNewHeal() then return true; end
 		end
 	-- Else find a new target to start casting a heal on.
 	else
-		-- Power:word shield a target at low health.
-		local shieldTargetUnit, healthOfTarget = mhb_GetLowestHealthTarget(SPELL_POWER_WORD_SHIELD);
-		if healthOfTarget < THRESHOLD_CURRENTHEALTH_POWERWORD_SHIELD and 
-					mhb_GetMissingHealth(shieldTargetUnit) > THRESHOLD_MISSINGHEALTH_POWERWORD_SHIELD and 
-					mhb_Priest_CanCastPWS(shieldTargetUnit) then
-			mhb_TargetAndCast(shieldTargetUnit, SPELL_POWER_WORD_SHIELD);
-		-- Otherwise cast prayer of healing if good choice.
-		elseif mhb_Priest_GetPOHEffect() > COEF_PRAYER_OF_HEALING then
-			mhb_TargetAndCast("player", SPELL_PRAYER_OF_HEALING);
-		-- Otherwise just heal with heals.
-		else
-			local healTargetUnit, missingHealth = mhb_GetMostDamagedTarget(SPELL_GREATER_HEAL);
-			if missingHealth > HEALVALUE_GREATER_HEAL then
-				mhb_TargetAndCast(healTargetUnit, SPELL_GREATER_HEAL);
-			elseif missingHealth > HEALVALUE_GREATER_HEAL_DOWNRANKED then
-				mhb_TargetAndCast(healTargetUnit, SPELL_GREATER_HEAL_DOWNRANKED);
-			elseif missingHealth > 0 then
-				mhb_TargetAndCast(healTargetUnit, SPELL_HEAL_DOWNRANKED);
-			else
-				isHealing = false;
-			end
-			-- By now we should be casting if there's a target that needs heals, if we're not we're probably moving, so cast renew instead.
-			if not mhb_IsCasting() and missingHealth > HEALVALUE_RENEW * COEF_RENEW and not mhb_HasBuff(healTargetUnit, BUFF_RENEW) then
-				mhb_TargetAndCast(healTargetUnit, SPELL_RENEW);
-			end
-		end
+		if mhb_Priest_StartNewHeal() then return true; end
 	end
-	return isHealing;
+	return false;
 end
 
 -- Dispel for priests
@@ -164,14 +181,12 @@ function mhb_Priest_Dispel()
 	-- Dispel Magic
 	local dispelUnit = mhb_GetDispelTarget(SPELL_DISPEL_MAGIC, "Magic", "none")
 	if dispelUnit ~= "none" then
-		mhb_TargetAndCast(dispelUnit, SPELL_DISPEL_MAGIC);
-		return true;
+		if mhb_TargetAndCast(dispelUnit, SPELL_DISPEL_MAGIC); return true; end
 	end
 	-- Abolish Disease
 	dispelUnit = mhb_GetDispelTarget(SPELL_ABOLISH_DISEASE, "Disease", BUFF_ABOLISH_DISEASE)
 	if dispelUnit ~= "none" then
-		mhb_TargetAndCast(dispelUnit, SPELL_ABOLISH_DISEASE);
-		return true;
+		if mhb_TargetAndCast(dispelUnit, SPELL_ABOLISH_DISEASE) then return true; end
 	end
 	
 	return false;

@@ -10,7 +10,6 @@
 -- Implement chain heal calculator as well as a better way to know if I should cancel chain heal. Also downrank chainheal of effect is low, or re-calc with lower rank of chain heal.
 --		anyhow just downrank chain heal if max rank isnt needed.
 -- Make other characters report via communication their distances to other damaged units, and calculate chain heal effeciency that way.
--- OOC, drink if your oom to buff, should happen automatically if spellcast returns fail if oom.
 
 SPELL_ANCESTRAL_SPIRIT = "Ancestral Spirit(Rank 5)";
 SPELL_LIGHTNING_SHIELD = "Lightning Shield(Rank 7)";
@@ -106,8 +105,55 @@ function mhb_Shaman_RecastTotems()
 		if mhb_Rebuff(airTotemBuff, airTotemSpell, REBUFF_SELF) then return true; end
 	elseif airTotemSpell == SPELL_WINDFURY_TOTEM then
 		if not GetWeaponEnchantInfo() then
-			mhb_TargetAndCast("player", airTotemSpell);
+			if mhb_TargetAndCast("player", airTotemSpell) then return true; end
+		end
+	end
+	return false;
+end
+
+-- Checks if current casting heal should be cancelled. Returns true if it stopped casting
+function mhb_Shaman_CheckStopCasting()
+	local missingHealth = mhb_GetMissingHealth(currentTarget);
+	if mhb_IsOnGCDIn(GCD_TIME_LEFT_BEFORE_CANCEL) then
+		 return false; -- Do nothing, not worth interrupting a cast when on GCD, target may take dmg again before GCD is over.
+	elseif currentSpell == SPELL_HEALING_WAVE then
+		if missingHealth < HEALVALUE_HEALING_WAVE * COEF_CANCEL_HEAL then
+			mhb_StopCasting();
 			return true;
+		end
+	elseif currentSpell == SPELL_HEALING_WAVE_DOWNRANKED then
+		if missingHealth < HEALVALUE_HEALING_WAVE_DOWNRANKED * COEF_CANCEL_HEAL then
+			mhb_StopCasting();
+			return true;
+		end
+	elseif currentSpell == SPELL_CHAIN_HEAL then
+		if missingHealth < HEALVALUE_CHAIN_HEAL_1 * COEF_CANCEL_HEAL then		-- TODO better way to find out if I should cancel chain heal
+			mhb_StopCasting();
+			return true;
+		end
+	end
+	if not mhb_IsStillValidTarget(currentTarget) then
+		mhb_StopCasting();
+		return true;
+	end
+	return false;
+end
+
+-- Finds a new target to heal and starts casting.
+function mhb_Shaman_StartNewHeal()
+	-- cast chain heal if good choice.
+	local chainHealTarget, chainHealEffect = mhb_Shaman_GetChainHealEffect();
+	if chainHealEffect > COEF_CHAIN_HEAL then
+		if mhb_TargetAndCast(chainHealTarget, SPELL_CHAIN_HEAL) then return true; end
+	-- Otherwise just heal with heals.
+	else
+		local healTargetUnit, missingHealth = mhb_GetMostDamagedTarget(SPELL_HEALING_WAVE);
+		if missingHealth > HEALVALUE_HEALING_WAVE then
+			if mhb_TargetAndCast(healTargetUnit, SPELL_HEALING_WAVE) then return true; end
+		elseif missingHealth > 0 then
+			if mhb_TargetAndCast(healTargetUnit, SPELL_HEALING_WAVE_DOWNRANKED) then return true; end
+		else
+			return false;
 		end
 	end
 	return false;
@@ -115,47 +161,16 @@ end
 
 -- Heal for shaman
 function mhb_Shaman_Heal()
-	local isHealing = true;
-	-- If already casting, cancel cast if target has been healed enough already, or if target is no longer valid
+	-- If already casting, cancel cast if target has been healed enough already, or if target is no longer valid, after that start a new heal.
 	if mhb_IsCasting() then
-		local missingHealth = mhb_GetMissingHealth(currentTarget);
-		if mhb_IsOnGCDIn(GCD_TIME_LEFT_BEFORE_CANCEL) then
-			 return; -- Do nothing, not worth interrupting a cast when on GCD, target may take dmg again before GCD is over.
-		elseif currentSpell == SPELL_HEALING_WAVE then
-			if missingHealth < HEALVALUE_HEALING_WAVE * COEF_CANCEL_HEAL then
-				mhb_StopCasting();
-			end
-		elseif currentSpell == SPELL_HEALING_WAVE_DOWNRANKED then
-			if missingHealth < HEALVALUE_HEALING_WAVE_DOWNRANKED * COEF_CANCEL_HEAL then
-				mhb_StopCasting();
-			end
-		elseif currentSpell == SPELL_CHAIN_HEAL then
-			if missingHealth < HEALVALUE_CHAIN_HEAL_1 * COEF_CANCEL_HEAL then		-- TODO better way to find out if I should cancel chain heal
-				mhb_StopCasting();
-			end
-		end
-		if not mhb_IsStillValidTarget(currentTarget) then
-			mhb_StopCasting();
+		if mhb_Shaman_CheckStopCasting() then
+			if mhb_Shaman_StartNewHeal() then return true; end
 		end
 	-- Else find a new target to start casting a heal on.
 	else
-		-- cast chain heal if good choice.
-		local chainHealTarget, chainHealEffect = mhb_Shaman_GetChainHealEffect();
-		if chainHealEffect > COEF_CHAIN_HEAL then
-			mhb_TargetAndCast(chainHealTarget, SPELL_CHAIN_HEAL);
-		-- Otherwise just heal with heals.
-		else
-			local healTargetUnit, missingHealth = mhb_GetMostDamagedTarget(SPELL_HEALING_WAVE);
-			if missingHealth > HEALVALUE_HEALING_WAVE then
-				mhb_TargetAndCast(healTargetUnit, SPELL_HEALING_WAVE);
-			elseif missingHealth > 0 then
-				mhb_TargetAndCast(healTargetUnit, SPELL_HEALING_WAVE_DOWNRANKED);
-			else
-				isHealing = false;
-			end
-		end
+		if mhb_Shaman_StartNewHeal() then return true; end
 	end
-	return isHealing;
+	return false;
 end
 
 -- Dispel for shamans
@@ -163,14 +178,12 @@ function mhb_Shaman_Dispel()
 	-- Cure poison
 	local dispelUnit = mhb_GetDispelTarget(SPELL_CURE_POISON, "Poison", "none")
 	if dispelUnit ~= "none" then
-		mhb_TargetAndCast(dispelUnit, SPELL_CURE_POISON);
-		return true;
+		if mhb_TargetAndCast(dispelUnit, SPELL_CURE_POISON) then return true; end
 	end
 	-- Cure Disease
 	dispelUnit = mhb_GetDispelTarget(SPELL_CURE_DISEASE, "Disease", "none")
 	if dispelUnit ~= "none" then
-		mhb_TargetAndCast(dispelUnit, SPELL_CURE_DISEASE);
-		return true;
+		if mhb_TargetAndCast(dispelUnit, SPELL_CURE_DISEASE) then return true; end
 	end
 	
 	return false;

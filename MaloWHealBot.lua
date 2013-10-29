@@ -16,8 +16,6 @@
 -- OnEvent SpellStart and SpellStop, use a global bool for IsCasting.
 --
 -- Line of Sight, implement some sort of blacklisting of targets that are LOS
--- 
--- Handle out of mana, if u dont have mana for a spell u cant do it. Move on and do another one u can afford. CastSpell returns if it succeded? I should make my targetAndCast do that too.
 --
 -- Dispelling vs healing, have a priority next to each dispell, where 0 is blacklist (never dispell) and depending on priority and raid health etc. it chooses to dispell or heal.
 --
@@ -132,26 +130,22 @@ end
 -- General Functions ---------------------------------------------------------------
 ------------------------------------------------------------------------------------
 function mhb_Rebuff(buff, spell, rebuff)
-	local didAction = false;
 	if rebuff == REBUFF_RAID then
 		buffUnit = mhb_GetRebuffTarget(spell, buff, "none");
 		if buffUnit ~= "none" then
-			mhb_TargetAndCast(buffUnit, spell);
-			didAction = true;
+			if mhb_TargetAndCast(buffUnit, spell) then return true; end
 		end
 	elseif rebuff == REBUFF_RAID_MANAUSERS then
 		buffUnit = mhb_GetRebuffTarget(spell, buff, "HasMana");
 		if buffUnit ~= "none" then
-			mhb_TargetAndCast(buffUnit, spell);
-			didAction = true;
+			if mhb_TargetAndCast(buffUnit, spell) then return true; end
 		end	
 	elseif rebuff == REBUFF_SELF then
 		if not mhb_HasBuff("player", buff) then
-			mhb_TargetAndCast("player", spell);
-			didAction = true;
+			if mhb_TargetAndCast("player", spell) then return true; end
 		end
 	end
-	return didAction;
+	return false;
 end
 
 function mhb_DrinkIfNeeded(percent)
@@ -165,7 +159,6 @@ function mhb_DrinkIfNeeded(percent)
 end
 
 function mhb_Resurrect(spell)
-	local didAction = false;
 	if mhb_IsCasting() == true then
 		if currentSpell == spell then
 			if not UnitIsDead(currentTarget) then
@@ -175,10 +168,9 @@ function mhb_Resurrect(spell)
 	end
 	local deadUnit = mhb_GetDeadTarget(spell);
 	if deadUnit ~= "none" then
-		mhb_TargetAndCast(deadUnit, spell);
-		didAction = true;
+		if mhb_TargetAndCast(deadUnit, spell) then return true; end
 	end
-	return didAction;
+	return false;
 end
 
 function mhb_RemoveBuffsForRebuff()
@@ -397,11 +389,14 @@ function mhb_StopCasting()
 end
 
 -- Sets currentSpell and currentTarget and then targets the currentTarget, and starts casting the spell on it.
+-- NEEDS TO RETURN TRUE / FALSE. false if spellcast failed due to moving or oom.
+-- http://www.wowwiki.com/API_IsUsableSpell?oldid=391020 for oom? Was added december, might not exist in 1.12
 function mhb_TargetAndCast(unit, spell)
 	currentTarget = unit;
 	currentSpell = spell;
 	TargetUnit(currentTarget);
 	CastSpellByName(currentSpell);
+	return true;
 end
 
 -- Returns true if you're currently casting an action that is on your actionbar in slot 7 to 12.
