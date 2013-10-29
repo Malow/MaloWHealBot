@@ -1,0 +1,10 @@
+## Interface: 88888
+## Title: MaloWHealBot
+## DefaultState: enabled
+## Notes: This is a raid healing mod.
+## Version 1
+## Author: MaloW
+MaloWHealBot.xml
+MaloWHealBot.lua
+MaloWHealBotPriest.lua
+MaloWHealBotShaman.lua
