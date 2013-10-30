@@ -6,7 +6,7 @@
 -- Current way checking for windfury totem doesnt work if I start using mana oils on shamans.
 -- Natures swiftness / mana tide totem.
 -- Dont always recast totems over healing, if healing is really needed do that first.
--- Keep internal totem-timers, and on ready check recast if needed.
+-- Keep internal totem-timers, and on ready check recast if needed. And maybe recast when no1 needs heals and they only have 10 sec left.
 -- Implement chain heal calculator as well as a better way to know if I should cancel chain heal. Also downrank chainheal of effect is low, or re-calc with lower rank of chain heal.
 --		anyhow just downrank chain heal if max rank isnt needed.
 -- Make other characters report via communication their distances to other damaged units, and calculate chain heal effeciency that way.
@@ -193,6 +193,15 @@ end
 function mhb_Shaman_OOC()
 	-- If dead accept ress
 	if UnitIsDead("player") then AcceptResurrect() return; end
+	
+	-- check if you're drikning, if so continue drinking untill full or buff wears off.
+	if mhb_IsDrinking() then 
+		if mhb_GetManaPercent("player") > 0.95 then
+			SitOrStand();
+		else
+			return;
+		end
+	end
 	
 	-- Dispell
 	if mhb_Shaman_Dispel() then return; end

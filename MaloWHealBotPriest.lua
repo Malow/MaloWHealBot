@@ -197,6 +197,15 @@ function mhb_Priest_OOC()
 	-- If dead accept ress
 	if UnitIsDead("player") then AcceptResurrect() return; end
 	
+	-- check if you're drikning, if so continue drinking untill full or buff wears off.
+	if mhb_IsDrinking() then 
+		if mhb_GetManaPercent("player") > 0.95 then
+			SitOrStand();
+		else
+			return;
+		end
+	end
+	
 	-- Dispell
 	if mhb_Priest_Dispel() then return; end
 	

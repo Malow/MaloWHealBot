@@ -19,6 +19,20 @@
 --
 -- Dispelling vs healing, have a priority next to each dispell, where 0 is blacklist (never dispell) and depending on priority and raid health etc. it chooses to dispell or heal.
 --
+--
+-- TODAY:
+-- Target has to have taken 500 dmg for healers to cast a heal at all.
+--
+-- Stop healing wave spam with shammys, make them save their mana more and use it for chain heals.
+--
+-- Do a HPM calc, and change healing accordingly. 
+--
+-- If a target is damaged 2500, and there are 3 other healers, dont cast a heal that heals for 2500, do a 1k heal instead, kinda. Make the priests renew more as well if it's good HPM.
+--	The more healers in the raid the more you can count on healing coming from other sources as well.
+--
+-- Also could use some way to desync their castings so they dont all cast at the exact same time. Donno how though.. Initial delay on first spell cast when entering combat of 0 - 2 sec?
+--
+-- Solve the TargetAndCast returns.
 
 
 -- Static Global variables
@@ -150,7 +164,7 @@ end
 
 function mhb_DrinkIfNeeded(percent)
 	local didAction = false;
-	local manaPercent = UnitMana("player") / UnitManaMax("player");
+	local manaPercent = mhb_GetManaPercent("player");
 	if manaPercent < percent then
 		mhb_Drink();
 		didAction = true;
@@ -389,8 +403,12 @@ function mhb_StopCasting()
 end
 
 -- Sets currentSpell and currentTarget and then targets the currentTarget, and starts casting the spell on it.
--- NEEDS TO RETURN TRUE / FALSE. false if spellcast failed due to moving or oom.
--- http://www.wowwiki.com/API_IsUsableSpell?oldid=391020 for oom? Was added december, might not exist in 1.12
+-- NEEDS TO RETURN TRUE / FALSE. false if spellcast failed due to moving or oom or out of reagents.
+-- OOM: make a huge table with all spells and their costs, and implement a function that u send a spell in and returns true / false if u have enough mana for it.
+-- Runing: try /sit and if ur sitting /stand and cast succeeds? If not solveable change the priest returns to do like if(castSpell) then cast TryCastRenew() return
+-- WAIT, JUST AFTER CastSpellByName() do a isCasting() check, should work to see if said spell could be cast. Might not work due to lag tho...
+-- Out of reagent - have a certain bag contain reagents and implement the drink function to scan for reagent instead. Actually, just scan every bag for both drinks and reagents, when it finds return!
+-- Guess I could check for GCD as well straight after CastSpellByName as a way to see if the spellcast succeeded, might be the easiest if it works.
 function mhb_TargetAndCast(unit, spell)
 	currentTarget = unit;
 	currentSpell = spell;
@@ -530,10 +548,20 @@ function mhb_HasBuff(unit, buff)
 	return has;
 end
 
+-- returns the percent of mana of the unit
+function mhb_GetManaPercent(unit)
+	return UnitMana(unit) / UnitManaMax(unit);
+end
+
+-- Check if your drinking or not.
+function mhb_IsDrinking()
+	return mhb_HasBuff("player", BUFF_DRINKING);
+end
+
 -- Checks if ur currently drinking, if not then start drinking
 function mhb_Drink()
 	local noWater = true;
-	if not mhb_HasBuff("player", BUFF_DRINKING) then
+	if not mhb_IsDrinking() then
 		for i = 1, 16 do 
 			if ITEM_DRINK == GetContainerItemInfo(0, i) then
 				UseContainerItem(0, i);
