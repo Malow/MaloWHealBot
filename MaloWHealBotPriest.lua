@@ -7,6 +7,7 @@
 -- Flash heal
 -- Instead of having to set options for fort buff if not improved, have some sort of communication between healers where they say if they have improved or not.
 -- Spirit of redemption, if duration left of Spirit of Redemption is less than 2.8 sec only cast renews.
+-- Spirit of redemption, didnt heal properly really.. Is it because IsUnitDead is then true, and it just tries to accept a ress and then returns?
 
 SPELL_GREATER_HEAL = "Greater Heal(Rank 4)";
 SPELL_GREATER_HEAL_DOWNRANKED = "Greater Heal(Rank 1)";
