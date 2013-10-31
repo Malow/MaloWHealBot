@@ -53,13 +53,16 @@ function mhb_StopCasting()
 end
 
 -- Sets currentSpell and currentTarget and then targets the currentTarget, and starts casting the spell on it.
--- NEEDS TO RETURN TRUE / FALSE. false if spellcast failed due to moving or oom or out of reagents.
--- OOM: make a huge table with all spells and their costs, and implement a function that u send a spell in and returns true / false if u have enough mana for it.
+-- Returns true if spellcast-start was successfull. Otherwise false.
+-- Todo: Fix check against fail due to movement
 -- Runing: try /sit and if ur sitting /stand and cast succeeds? If not solveable change the priest returns to do like if(castSpell) then cast TryCastRenew() return
--- WAIT, JUST AFTER CastSpellByName() do a isCasting() check, should work to see if said spell could be cast. Might not work due to lag tho...
--- Out of reagent - have a certain bag contain reagents and implement the drink function to scan for reagent instead. Actually, just scan every bag for both drinks and reagents, when it finds return!
+-- WAIT, JUST AFTER CastSpellByName() do a isCasting() check, should work to see if said spell could be cast. Might not work due to lag tho.. UseIsInGCD for instants.
 -- Guess I could check for GCD as well straight after CastSpellByName as a way to see if the spellcast succeeded, might be the easiest if it works.
+-- All 3 solutions above is lag-prone, test them to see if any of them works.
 function mhb_TargetAndCast(unit, spell)
+	if not mhb_CanCastSpell(spell) then
+		return false;
+	end
 	currentTarget = unit;
 	currentSpell = spell;
 	TargetUnit(currentTarget);
@@ -212,12 +215,11 @@ end
 function mhb_Drink()
 	local noWater = true;
 	if not mhb_IsDrinking() then
-		for i = 1, 16 do 
-			if ITEM_DRINK == GetContainerItemInfo(0, i) then
-				UseContainerItem(0, i);
-				noWater = false;
-			end
-		end
+		local bag, slot = mhb_GetBagAndSlotForItem(ITEM_DRINK);
+		if bag and slot then
+			UseContainerItem(bag, slot);
+			noWater = false;
+		end		
 	else
 		noWater = false;
 	end
@@ -249,3 +251,63 @@ function mhb_PrintInPartyOrRaid(msg)
 		SendChatMessage(msg, "PARTY");
 	end
 end
+
+-- Scens thorugh all bans and slots for item, uses it when finds it and returns bag, slot, if not found returns nil, nil.
+function mhb_GetBagAndSlotForItem(item)
+	for bag = 0, 4 do 
+		for slot = 1, 16 do
+			if item == GetContainerItemInfo(bag, slot) then
+				return bag, slot;
+			end
+		end
+	end
+	return nil, nil;
+end
+
+-- Checks if you have enough mana and reagents for spell
+function mhb_CanCastSpell(spell)
+	if mhb_mhb_HasEnoughManaForSpell(spell) and mhb_HasEnoughReagentsForSpell(spell) then
+		return true;
+	end
+	return false;
+end
+
+-- Table containting all SPELL's and their MANACOST's
+manaCostTable = {};
+-- Uses above table to get the manacost of a spell
+function mhb_HasEnoughManaForSpell(spell)
+	local cost = manaCostTable[spell];
+	if cost then
+		if cost > UnitMana("player") then
+			return false;
+		end	
+		return true;
+	end
+	return false;
+end
+
+-- Table containing all SPELL's and their REAGENT's
+reagentCastTable = {};
+-- Uses above table to get the reagent of a spell
+function mhb_HasEnoughReagentsForSpell(spell)
+	local reagent = reagentCostTable[spell];
+	if reagent then
+		if mhb_GetBagAndSlotForItem(reagent) then
+			return true;
+		end	
+		return false;
+	end
+	return true;
+end
+
+
+
+
+
+
+
+
+
+
+
+

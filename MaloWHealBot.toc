@@ -10,3 +10,4 @@ MaloWHealBotPriest.lua
 MaloWHealBotShaman.lua
 MaloWHealBotUtilities.lua
 MaloWLuaUtils.lua
+MaloWHealBotLogic.lua
