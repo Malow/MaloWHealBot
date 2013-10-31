@@ -266,7 +266,7 @@ end
 
 -- Checks if you have enough mana and reagents for spell
 function mhb_CanCastSpell(spell)
-	if mhb_mhb_HasEnoughManaForSpell(spell) and mhb_HasEnoughReagentsForSpell(spell) then
+	if mhb_HasEnoughManaForSpell(spell) and mhb_HasEnoughReagentsForSpell(spell) then
 		return true;
 	end
 	return false;
@@ -283,7 +283,7 @@ function mhb_HasEnoughManaForSpell(spell)
 		end	
 		return true;
 	end
-	return false;
+	return true;
 end
 
 -- Table containing all SPELL's and their REAGENT's
