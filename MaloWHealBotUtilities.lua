@@ -52,10 +52,10 @@ function mhb_StopCasting()
 	SpellStopCasting();
 end
 
--- Sets currentSpell and currentTarget and then targets the currentTarget, and starts casting the spell on it.
--- Returns true if spellcast-start was successfull. Otherwise false.
--- Todo: Fix check against fail due to movement
+-- Sets currentSpell and currentTarget and then targets the currentTarget, and starts casting the spell on it. Returns true if spellcast-start was successfull. Otherwise false.
 -- Runing: try /sit and if ur sitting /stand and cast succeeds? If not solveable change the priest returns to do like if(castSpell) then cast TryCastRenew() return
+-- Currently doesnt work with spells that doesn't trigger GCD.
+
 -- WAIT, JUST AFTER CastSpellByName() do a isCasting() check, should work to see if said spell could be cast. Might not work due to lag tho.. UseIsInGCD for instants.
 -- Guess I could check for GCD as well straight after CastSpellByName as a way to see if the spellcast succeeded, might be the easiest if it works.
 -- All 3 solutions above is lag-prone, test them to see if any of them works.
@@ -67,7 +67,10 @@ function mhb_TargetAndCast(unit, spell)
 	currentSpell = spell;
 	TargetUnit(currentTarget);
 	CastSpellByName(currentSpell);
-	return true;
+	if mhb_IsOnGCDIn(0) then
+		return true
+	end
+	return false;
 end
 
 -- Returns true if you're currently casting an action that is on your actionbar in slot 7 to 12.

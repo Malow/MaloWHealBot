@@ -32,8 +32,6 @@
 --
 -- Also could use some way to desync their castings so they dont all cast at the exact same time. Donno how though.. Initial delay on first spell cast when entering combat of 0 - 2 sec?
 --
--- TargetAndCast: movement
---
 -- Fill up manacost and reagent tables
 -- 
 --	Instead of scanning through all bags for reagent / water checks, do it once upon load, and keep temporary counters for the remaining amounts.
