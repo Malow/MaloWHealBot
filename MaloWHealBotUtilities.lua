@@ -211,21 +211,17 @@ function mhb_IsDrinking()
 	return mhb_HasBuff("player", BUFF_DRINKING);
 end
 
--- Checks if ur currently drinking, if not then start drinking
+-- Checks if ur currently drinking, if not then start drinking, returns true if u are drinking, or if u started drinking, false if ur not drinking.
 function mhb_Drink()
-	local noWater = true;
 	if not mhb_IsDrinking() then
-		local bag, slot = mhb_GetBagAndSlotForItem(ITEM_DRINK);
-		if bag and slot then
-			UseContainerItem(bag, slot);
-			noWater = false;
-		end		
-	else
-		noWater = false;
+		if mhb_UseItem(ITEM_DRINK) then
+			return true;
+		else
+			mhb_Print("No water found in bags!");
+			return false;
+		end
 	end
-	if noWater then
-		mhb_Print("No water found in first backpack!");
-	end
+	return true;
 end
 
 -- Returns how long cooldown is left of spell
@@ -250,6 +246,16 @@ function mhb_PrintInPartyOrRaid(msg)
 	else
 		SendChatMessage(msg, "PARTY");
 	end
+end
+
+-- Looks up and uses an item, returns false if said item doesnt exist.
+function mhb_UseItem(item)
+	local bag, slot = mhb_GetBagAndSlotForItem(item);
+	if bag ~= nil and slot ~= nil then
+		UseContainerItem(bag, slot);
+		return true;
+	end
+	return false;
 end
 
 -- Scens thorugh all bans and slots for item, uses it when finds it and returns bag, slot, if not found returns nil, nil.
