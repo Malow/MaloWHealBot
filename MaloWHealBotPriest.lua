@@ -157,7 +157,7 @@ function mhb_Priest_StartNewHeal()
 		end
 		-- By now we should be casting if there's a target that needs heals, if we're not we're probably moving, so cast renew instead.
 		if not mhb_IsCasting() and missingHealth > HEALVALUE_RENEW * COEF_RENEW and not mhb_HasBuff(healTargetUnit, BUFF_RENEW) then
-			if mhb_TargetAndCast(healTargetUnit, SPELL_RENEW) then return true;
+			if mhb_TargetAndCast(healTargetUnit, SPELL_RENEW) then return true; end
 		end
 	end
 	return false;
@@ -182,7 +182,7 @@ function mhb_Priest_Dispel()
 	-- Dispel Magic
 	local dispelUnit = mhb_GetDispelTarget(SPELL_DISPEL_MAGIC, "Magic", "none")
 	if dispelUnit ~= "none" then
-		if mhb_TargetAndCast(dispelUnit, SPELL_DISPEL_MAGIC); return true; end
+		if mhb_TargetAndCast(dispelUnit, SPELL_DISPEL_MAGIC) then return true; end
 	end
 	-- Abolish Disease
 	dispelUnit = mhb_GetDispelTarget(SPELL_ABOLISH_DISEASE, "Disease", BUFF_ABOLISH_DISEASE)
