@@ -207,6 +207,103 @@ function mhb_GetDamagedTargets(spell, melee, damageReq)
 	return targets;
 end
 
+-- Table containting all SPELL's and their MANACOST's
+manaCostTable = {};
+-- Uses above table to get the manacost of a spell
+function mhb_HasEnoughManaForSpell(spell)
+	local cost = manaCostTable[spell];
+	if cost then
+		if cost > UnitMana("player") then
+			return false;
+		end	
+		return true;
+	end
+	return true;
+end
+
+-- Table containing all SPELL's and their REAGENT's
+reagentCostTable = {};
+-- Uses above table to get the reagent of a spell
+function mhb_HasEnoughReagentsForSpell(spell)
+	local reagent = reagentCostTable[spell];
+	if reagent then
+		if mhb_GetBagAndSlotForItem(reagent) then
+			return true;
+		end	
+		return false;
+	end
+	return true;
+end
+
+-- Recalculates healing coef depending on how many healers in raid.
+function mhb_RecalculateCoefAmountOfHealers(spell)
+	local nrOfHealers = mhb_GetNrOfValidRaidMembersByRole("HEALER", spell);
+	-- Makes the coef 1 when it's only you, and 2 when there's 20 other healers. Linear scaling between.
+	COEF_AMOUNT_OF_HEALERS = 1 + (nrOfHealers - 1) / 20;
+end
+
+-- table used for heal values
+healValueTable = {};
+-- logic for deciding to cast a basic single-target heal depending on missinghealth, heal value, and coefs.
+function mhb_CastHealIfGood(spell, target)
+	local healValue = healValueTable[spell];
+	if not healValue then return false; end
+	
+	local missingHealth = mhb_GetMissingHealth(target);
+	if missingHealth > healValue * COEF_AMOUNT_OF_HEALERS then
+		if mhb_TargetAndCast(target, spell) then return true; end
+	end
+	return false;
+end
+
+-- Checks if the current heal would be overheal or not
+function mhb_IsCurrentHealGood(target, healValue)
+	local missingHealth = mhb_GetMissingHealth(target);
+	if missingHealth < healValue * COEF_CANCEL_HEAL * COEF_AMOUNT_OF_HEALERS then
+		return false;
+	end
+	return true;
+end
+
+-- table used for spellcast times
+spellCastTimeTable = {};
+-- logic for deciding if a a basic single-target heal currently being cast should be interrupted on missinghealth, heal value, and coefs.
+function mhb_CancelHealIfGood(target, spell)
+	local healValue = healValueTable[spell];
+	if healValue == nil then return false; end
+	
+	local spellCastTime = spellCastTimeTable[spell];
+	if spellCastTime == nil then spellCastTime = 0; end
+	
+	local timeLeftOfCast = spellCastTime - mhb_GetTimeSinceCastStart();
+	
+	-- if we have time left before our heal finishes
+	if timeLeftOfCast > STOP_CASTING_TIME then 	
+		local newTarget, newMissingHealth = mhb_GetMostDamagedTarget(spell);
+		-- if the best healing target is the current one, just continue the cast
+		if newTarget == target then 
+			return false; 
+		else
+			-- If another target is better, and it's damaged over 2k, and our current heal is bad, then stop casting it
+			if newMissingHealth > 2000 and not mhb_IsCurrentHealGood(target, healValue) then
+				mhb_StopCasting();
+				return true;
+			end
+		end
+	-- else we have to make a decision if we should stop it or let it hit.
+	else	
+		if not mhb_IsCurrentHealGood(target, healValue) then
+			mhb_StopCasting();
+			return true;
+		end
+	end	
+	return false;
+end
+
+
+
+
+
 
 
 

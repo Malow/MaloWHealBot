@@ -1,13 +1,12 @@
 -- PRIEST
 -- ToDo: 
--- Don't stop cast until the very 0.2 last sec (isCasting) unless there's another target that needs healing. Requires combat log parsing / event listening to know 
---		how long is left of the cast. NOT NESSESERIALY, ADD TIMERS AND USE GetTime() to check time left etc.
 -- Renew: General GetTanks() function, and cast renew on them as soon as they take damage.
 -- Dispel Magic offensive.
 -- Flash heal
 -- Instead of having to set options for fort buff if not improved, have some sort of communication between healers where they say if they have improved or not.
 -- Spirit of redemption, if duration left of Spirit of Redemption is less than 2.8 sec only cast renews.
 -- Spirit of redemption, didnt heal properly really.. Is it because IsUnitDead is then true, and it just tries to accept a ress and then returns?
+-- When moving, if healTarget already has renew or cant be cast on, get a new target and renew that.
 
 SPELL_GREATER_HEAL = "Greater Heal(Rank 4)";
 SPELL_GREATER_HEAL_DOWNRANKED = "Greater Heal(Rank 1)";
@@ -36,11 +35,16 @@ DEBUFF_WEAKENED_SOUL = "Interface\\Icons\\Spell_Holy_AshesToAshes";
 
 HEALVALUE_GREATER_HEAL = 2400;	-- How much greater heal maxrank heals
 HEALVALUE_GREATER_HEAL_DOWNRANKED = 1400; -- How much greater heal rank1 heals
-HEALVALUE_HEAL_DOWNRANKED = 600; -- How much a rank 1 heal heals.
+HEALVALUE_HEAL_DOWNRANKED = 500; -- How much a rank 1 heal heals.
 HEALVALUE_RENEW = 1400; -- How much a renew heals.
+HEALVALUE_PRAYER_OF_HEALING = 1200; -- How much prayer of healing heals on a single target.
 THRESHOLD_CURRENTHEALTH_POWERWORD_SHIELD = 1000; -- Amount of current health target needs to be at most at to cast power word shield on him.
 THRESHOLD_MISSINGHEALTH_POWERWORD_SHIELD = 1000; -- Amount of missing health targets needs to have at least to cast power word shield on him. (to counter max-health-reducing effects)
-HEALVALUE_PRAYER_OF_HEALING = 1200; -- How much prayer of healing heals on a single target.
+
+CASTTIME_GREATER_HEAL = 2.5;
+CASTTIME_GREATER_HEAL_DOWNRANKED = 2.5;
+CASTTIME_PRAYER_OF_HEALING = 3.0;
+CASTTIME_HEAL_DOWNRANKED = 2.5;
 
 COEF_PRAYER_OF_HEALING = 0.75	-- Multiplier for required amount of its full effect to be cast.
 COEF_RENEW = 0.5 -- Multiplier for required amount of its full effect to be cast
@@ -101,27 +105,15 @@ end
 
 -- Checks if current casting heal should be cancelled. Returns true if it stopped casting
 function mhb_Priest_CheckStopCasting()
-	local missingHealth = mhb_GetMissingHealth(currentTarget);
 	if mhb_IsOnGCDIn(GCD_TIME_LEFT_BEFORE_CANCEL) then
 		 return false; -- Do nothing, not worth interrupting a cast when on GCD, target may take dmg again before GCD is over.
-	elseif currentSpell == SPELL_GREATER_HEAL then
-		if missingHealth < HEALVALUE_GREATER_HEAL * COEF_CANCEL_HEAL then
-			mhb_StopCasting();
-			return true;
-		end
-	elseif currentSpell == SPELL_GREATER_HEAL_DOWNRANKED then
-		if missingHealth < HEALVALUE_GREATER_HEAL_DOWNRANKED * COEF_CANCEL_HEAL then
-			mhb_StopCasting();
-			return true;
-		end
 	elseif currentSpell == SPELL_PRAYER_OF_HEALING then
 		if mhb_Priest_GetPOHEffect() < COEF_PRAYER_OF_HEALING * COEF_CANCEL_HEAL then
 			mhb_StopCasting();
 			return true;
 		end
-	elseif currentSpell == SPELL_HEAL_DOWNRANKED then
-		if missingHealth == 0 then
-			mhb_StopCasting();
+	else
+		if mhb_CancelHealIfGood(currentTarget, currentSpell) then
 			return true;
 		end
 	end
@@ -146,12 +138,14 @@ function mhb_Priest_StartNewHeal()
 	-- Otherwise just heal with heals.
 	else
 		local healTargetUnit, missingHealth = mhb_GetMostDamagedTarget(SPELL_GREATER_HEAL);
-		if missingHealth > HEALVALUE_GREATER_HEAL then
-			if mhb_TargetAndCast(healTargetUnit, SPELL_GREATER_HEAL) then return true; end
-		elseif missingHealth > HEALVALUE_GREATER_HEAL_DOWNRANKED then
-			if mhb_TargetAndCast(healTargetUnit, SPELL_GREATER_HEAL_DOWNRANKED) then return true; end
-		elseif missingHealth > 0 then
-			if mhb_TargetAndCast(healTargetUnit, SPELL_HEAL_DOWNRANKED) then return true; end
+		if mhb_CastHealIfGood(SPELL_GREATER_HEAL, healTargetUnit) then
+			return true;
+		elseif missingHealth > HEALVALUE_RENEW * COEF_RENEW and not mhb_HasBuff(healTargetUnit, BUFF_RENEW) then
+			if mhb_TargetAndCast(healTargetUnit, SPELL_RENEW) then return true; end
+		elseif mhb_CastHealIfGood(SPELL_GREATER_HEAL_DOWNRANKED, healTargetUnit) then
+			return true;
+		elseif mhb_CastHealIfGood(SPELL_HEAL_DOWNRANKED, healTargetUnit) then
+			return true;
 		else
 			return false;
 		end
@@ -165,6 +159,9 @@ end
 
 -- Function for healing for priests
 function mhb_Priest_Heal()
+	-- Recalculate the healing coef depending on nr of healers in raid.
+	mhb_RecalculateCoefAmountOfHealers(SPELL_GREATER_HEAL);
+
 	-- If already casting, cancel cast if target has been healed enough already, or if target is no longer valid, after that start a new heal.
 	if mhb_IsCasting() then
 		if mhb_Priest_CheckStopCasting() then
@@ -254,12 +251,60 @@ function mhb_Priest(msg)
 	end
 end
 
+-- Loads up priest
+function mhb_Priest_Load()
+	-- Set GCD check spell.
+	GCD_CHECK_SPELL = 76; -- Renew(Rank 1)
+	
+	-- Set manacosts into table
+	manaCostTable[SPELL_GREATER_HEAL] = 556;
+	manaCostTable[SPELL_GREATER_HEAL_DOWNRANKED] = 314;
+	manaCostTable[SPELL_RENEW] = 365;
+	manaCostTable[SPELL_HEAL_DOWNRANKED] = 131;
+	manaCostTable[SPELL_POWER_WORD_SHIELD] = 500;
+	manaCostTable[SPELL_PRAYER_OF_HEALING] = 824;
+	manaCostTable[SPELL_POWER_WORD_FORTITUDE] = 1695;
+	manaCostTable[SPELL_DIVINE_SPIRIT] = 873;
+	manaCostTable[SPELL_INNER_FIRE] = 315;
+	manaCostTable[SPELL_SHADOW_PROTECTION] = 650;
+	manaCostTable[SPELL_RESURRECTION] = 1077;
+	manaCostTable[SPELL_DISPEL_MAGIC] = 258;
+	manaCostTable[SPELL_ABOLISH_DISEASE] = 215;
+	
+	-- Set heal values into table
+	healValueTable[SPELL_GREATER_HEAL] = HEALVALUE_GREATER_HEAL;
+	healValueTable[SPELL_GREATER_HEAL_DOWNRANKED] = HEALVALUE_GREATER_HEAL_DOWNRANKED;
+	healValueTable[SPELL_HEAL_DOWNRANKED] = HEALVALUE_HEAL_DOWNRANKED;
+	healValueTable[SPELL_RENEW] = HEALVALUE_RENEW;
+	healValueTable[SPELL_PRAYER_OF_HEALING] = HEALVALUE_PRAYER_OF_HEALING;
+	
+	-- Set spellcast time table
+	spellCastTimeTable[SPELL_GREATER_HEAL_DOWNRANKED] = CASTTIME_GREATER_HEAL_DOWNRANKED;
+	spellCastTimeTable[SPELL_GREATER_HEAL] = CASTTIME_GREATER_HEAL;
+	spellCastTimeTable[SPELL_PRAYER_OF_HEALING] = CASTTIME_PRAYER_OF_HEALING;
+	spellCastTimeTable[SPELL_HEAL_DOWNRANKED] = CASTTIME_HEAL_DOWNRANKED;
+
+	-- Set reagentcosts into table
+	
+end
+
 -- Set option for priest
 function mhb_Priest_SetOption(msg)
 	if msg == "skipImpFortCheck true" then
 		skipImpFortCheck = true;
 	elseif msg == "skipImpFortCheck false" then
 		skipImpFortCheck = false;
+	end
+	
+	-- quick cmds:
+	if msg == "fort" then
+		skipImpFortCheck = not skipImpFortCheck;
+		if skipImpFortCheck then
+			mhb_Print("true");	
+		else
+			mhb_Print("false");	
+		end
+		
 	end
 end
 

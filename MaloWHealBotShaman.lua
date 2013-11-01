@@ -10,6 +10,7 @@
 -- Implement chain heal calculator as well as a better way to know if I should cancel chain heal. Also downrank chainheal of effect is low, or re-calc with lower rank of chain heal.
 --		anyhow just downrank chain heal if max rank isnt needed.
 -- Make other characters report via communication their distances to other damaged units, and calculate chain heal effeciency that way.
+-- Some sort of action while moving, NS + heal?
 
 SPELL_ANCESTRAL_SPIRIT = "Ancestral Spirit(Rank 5)";
 SPELL_LIGHTNING_SHIELD = "Lightning Shield(Rank 7)";
@@ -43,6 +44,11 @@ BUFF_STRENGTH_OF_EARTH_TOTEM = "Interface\\Icons\\Spell_Nature_EarthBindTotem";
 BUFF_STONESKIN_TOTEM = "Interface\\Icons\\Spell_Nature_StoneSkinTotem";
 BUFF_TRANQUIL_AIR_TOTEM = "Interface\\Icons\\Spell_Nature_Brilliance";
 BUFF_GRACE_OF_AIR_TOTEM = "Interface\\Icons\\Spell_Nature_InvisibilityTotem";
+
+CASTTIME_HEALING_WAVE = 2.5;
+CASTTIME_HEALING_WAVE_DOWNRANKED = 2.5;
+CASTTIME_CHAIN_HEAL = 2.5;
+CASTTIME_LESSER_HEALING_WAVE = 1.5;
 
 -- Returns buff and spell of which earth totem best suits to be used.
 function mhb_Shaman_GetEarthTotem()
@@ -113,22 +119,16 @@ end
 
 -- Checks if current casting heal should be cancelled. Returns true if it stopped casting
 function mhb_Shaman_CheckStopCasting()
-	local missingHealth = mhb_GetMissingHealth(currentTarget);
 	if mhb_IsOnGCDIn(GCD_TIME_LEFT_BEFORE_CANCEL) then
 		 return false; -- Do nothing, not worth interrupting a cast when on GCD, target may take dmg again before GCD is over.
-	elseif currentSpell == SPELL_HEALING_WAVE then
-		if missingHealth < HEALVALUE_HEALING_WAVE * COEF_CANCEL_HEAL then
-			mhb_StopCasting();
-			return true;
-		end
-	elseif currentSpell == SPELL_HEALING_WAVE_DOWNRANKED then
-		if missingHealth < HEALVALUE_HEALING_WAVE_DOWNRANKED * COEF_CANCEL_HEAL then
-			mhb_StopCasting();
-			return true;
-		end
 	elseif currentSpell == SPELL_CHAIN_HEAL then
+		local missingHealth = mhb_GetMissingHealth(currentTarget);
 		if missingHealth < HEALVALUE_CHAIN_HEAL_1 * COEF_CANCEL_HEAL then		-- TODO better way to find out if I should cancel chain heal
 			mhb_StopCasting();
+			return true;
+		end
+	else
+		if mhb_CancelHealIfGood(currentTarget, currentSpell) then
 			return true;
 		end
 	end
@@ -148,19 +148,23 @@ function mhb_Shaman_StartNewHeal()
 	-- Otherwise just heal with heals.
 	else
 		local healTargetUnit, missingHealth = mhb_GetMostDamagedTarget(SPELL_HEALING_WAVE);
-		if missingHealth > HEALVALUE_HEALING_WAVE then
-			if mhb_TargetAndCast(healTargetUnit, SPELL_HEALING_WAVE) then return true; end
-		elseif missingHealth > 0 then
-			if mhb_TargetAndCast(healTargetUnit, SPELL_HEALING_WAVE_DOWNRANKED) then return true; end
+		if mhb_CastHealIfGood(SPELL_HEALING_WAVE, healTargetUnit) then
+			return true;
+		elseif mhb_CastHealIfGood(SPELL_HEALING_WAVE_DOWNRANKED, healTargetUnit) then
+			return true;
 		else
 			return false;
 		end
+		-- Here we're currently moving so cast instant, shammys doesnt have isntans. NS + heal? TODO
 	end
 	return false;
 end
 
 -- Heal for shaman
 function mhb_Shaman_Heal()
+	-- Recalculate the healing coef depending on nr of healers in raid.
+	mhb_RecalculateCoefAmountOfHealers(SPELL_HEALING_WAVE);
+	
 	-- If already casting, cancel cast if target has been healed enough already, or if target is no longer valid, after that start a new heal.
 	if mhb_IsCasting() then
 		if mhb_Shaman_CheckStopCasting() then
@@ -238,3 +242,48 @@ function mhb_Shaman()
 		mhb_Shaman_OOC();
 	end
 end
+
+-- Loads up shaman
+function mhb_Shaman_Load()
+	-- Set GCD check spell.
+	GCD_CHECK_SPELL = 129; -- Healing Wave(Rank 1)
+	
+	-- Set manacosts into table
+	manaCostTable[SPELL_ANCESTRAL_SPIRIT] = 1368;
+	manaCostTable[SPELL_LIGHTNING_SHIELD] = 370;
+	manaCostTable[SPELL_MANA_SPRING_TOTEM] = 75;
+	manaCostTable[SPELL_STRENGTH_OF_EARTH_TOTEM] = 168;
+	manaCostTable[SPELL_STONESKIN_TOTEM] = 157;
+	manaCostTable[SPELL_WINDFURY_TOTEM] = 187;
+	manaCostTable[SPELL_GRACE_OF_AIR_TOTEM] = 187;
+	manaCostTable[SPELL_TRANQUIL_AIR_TOTEM] = 90;
+	manaCostTable[SPELL_CHAIN_HEAL] = 384;
+	manaCostTable[SPELL_LESSER_HEALING_WAVE] = 361;
+	manaCostTable[SPELL_HEALING_WAVE] = 532;
+	manaCostTable[SPELL_HEALING_WAVE_DOWNRANKED] = 147;
+	manaCostTable[SPELL_CURE_POISON] = 136;
+	manaCostTable[SPELL_CURE_DISEASE] = 136;
+	
+	-- Set heal values into table
+	healValueTable[SPELL_HEALING_WAVE] = HEALVALUE_HEALING_WAVE;
+	healValueTable[SPELL_HEALING_WAVE_DOWNRANKED] = HEALVALUE_HEALING_WAVE_DOWNRANKED;
+	healValueTable[SPELL_LESSER_HEALING_WAVE] = HEALVALUE_LESSER_HEALING_WAVE;
+	healValueTable[SPELL_CHAIN_HEAL] = HEALVALUE_CHAIN_HEAL_1 + HEALVALUE_CHAIN_HEAL_2 + HEALVALUE_CHAIN_HEAL_3;
+	
+	-- Set spellcast time table
+	spellCastTimeTable[SPELL_HEALING_WAVE] = CASTTIME_HEALING_WAVE;
+	spellCastTimeTable[SPELL_HEALING_WAVE_DOWNRANKED] = CASTTIME_HEALING_WAVE_DOWNRANKED;
+	spellCastTimeTable[SPELL_LESSER_HEALING_WAVE] = CASTTIME_LESSER_HEALING_WAVE;
+	spellCastTimeTable[SPELL_CHAIN_HEAL] = CASTTIME_CHAIN_HEAL;
+
+	-- Set reagentcosts into table
+
+end
+
+
+
+
+
+
+
+

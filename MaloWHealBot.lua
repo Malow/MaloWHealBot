@@ -4,16 +4,12 @@
 --
 -- A way for healers to scan other healers in the raid and see what they are casting and on what and duration left, guesstimate how much they will 
 -- 		heal for and calculate effectiveMissinghealth through that too.
---		
---	Potential problem with using IsCurrentAction() to check for isCasting() -> if IsCurrentAction() has lag the bot might get a target and start casting, and on
--- 		next iteration IsCurrentAction() is false due to lag, and it picks another target and starts casting on that, but the heal actually starts on the old target.
---		The StopCasting part is now failing cuz it thinks ur casting on another target. Also might give delay between stopping cast and starting new cast?
 --
 -- Outside /mhbready trigger, scan whisper, party and raid for "MHBREADY"?
 --
 -- Use CDs / racials
 --
--- OnEvent SpellStart and SpellStop, use a global bool for IsCasting.
+-- OnEvent SpellStart and SpellStop, use a global bool for IsCasting? Or not? current way works...
 --
 -- Line of Sight, implement some sort of blacklisting of targets that are LOS
 --
@@ -21,22 +17,15 @@
 --
 --
 -- TODAY:
--- Target has to have taken 500 dmg for healers to cast a heal at all.
---
--- Stop healing wave spam with shammys, make them save their mana more and use it for chain heals.
+-- Stop healing wave spam with shammys, make them save their mana more and use it for chain heals. Use a special modified on their heal-amounts or something.
 --
 -- Do a HPM calc, and change healing accordingly. 
---
--- If a target is damaged 2500, and there are 3 other healers, dont cast a heal that heals for 2500, do a 1k heal instead, kinda. Make the priests renew more as well if it's good HPM.
---	The more healers in the raid the more you can count on healing coming from other sources as well.
---
--- Also could use some way to desync their castings so they dont all cast at the exact same time. Donno how though.. Initial delay on first spell cast when entering combat of 0 - 2 sec?
---
--- Fill up manacost and reagent tables
 -- 
 --	Instead of scanning through all bags for reagent / water checks, do it once upon load, and keep temporary counters for the remaining amounts.
 --
-
+-- If drinking buff runs out and still not full mana, char keeps sitting down cuz isDrinking is false... Bool for isDrinking that gets checked / set too? So if that bool is true and buff is gone, set it false, and make 
+--		char stand up?
+--
 
 
 -- Static Global variables
@@ -47,6 +36,7 @@ BUFF_DRINKING = "Interface\\Icons\\INV_Drink_07";
 ITEM_DRINK = "Interface\\Icons\\INV_Potion_01";
 MAX_BUFFS = 32;
 MAX_DEBUFFS = 32;
+STOP_CASTING_TIME = 0.3;
 
 REBUFF_SELF = "RebuffSelf";
 REBUFF_RAID = "RebuffRaid";
@@ -59,6 +49,8 @@ TIME_EIGHT_MINUTES = 480;
 currentTarget = "player";
 currentSpell = "none";
 GCD_CHECK_SPELL = 0;
+COEF_AMOUNT_OF_HEALERS = 1;
+startCastTime = 0;
 
 
 -- Main
@@ -108,25 +100,30 @@ SlashCmdList["MHBOPTIONCOMMAND"] = function(msg)
 end 
 SLASH_MHBOPTIONCOMMAND1 = "/mhboption";
 
--- Register eventlistening, this gets called before globals are given values, so global values set here will be overridden by default values.
+-- Register eventlistening, this gets called before globals are given values, so global values set here will be overridden by default values. This is also called before the other files are loaded.
 function mhb_OnLoad()
-	local playerClass = mhb_GetClass("player");
-	mhb_Print("MaloWHealBot loaded for class " .. playerClass);
 	this:RegisterEvent("ADDON_LOADED");
+	this:RegisterEvent("SPELLCAST_START");
 end
 
+hasLoaded = false;
 -- load class specific stuff.
 function mhb_AfterLoad()
+	if hasLoaded then 
+		return;
+	end
 	local playerClass = mhb_GetClass("player");
+	mhb_Print("MaloWHealBot loaded for class " .. playerClass);
 	if playerClass == "PRIEST" then
-		GCD_CHECK_SPELL = 76; -- Renew(Rank 1)
+		mhb_Priest_Load();
 	end
 	if playerClass == "SHAMAN" then
-		GCD_CHECK_SPELL = 129; -- Healing Wave(Rank 1)
+		mhb_Shaman_Load();
 	end
 	
 	-- Disable autoself cast to make the mhb_IsSpellInRange checker work.
 	SetCVar("autoSelfCast", 0);
+	hasLoaded = true;
 end
 
 --	this:RegisterEvent("SPELLCAST_START");
@@ -141,6 +138,9 @@ end
 function mhb_OnEvent()
 	if event == "ADDON_LOADED" then
 		mhb_AfterLoad();
+	end
+	if event == "SPELLCAST_START" then
+		startCastTime = GetTime();
 	end
 end
 

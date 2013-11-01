@@ -24,6 +24,31 @@ function mhb_GetNrOfValidPartyMembersByClass(class, spell)
 	return count;
 end
 
+-- Returns amount of raid members based on role
+function mhb_GetNrOfValidRaidMembersByRole(role, spell)
+	local count = 0;
+	for i = 1, GetNumRaidMembers() do
+		if role == "MELEE" and mhb_IsMelee("raid" .. i) and mhb_IsValidTarget("raid" .. i, spell) then
+			count = count + 1;
+		end
+		if role == "HEALER" and mhb_IsHealer("raid" .. i) and mhb_IsValidTarget("raid" .. i, spell) then
+			count = count + 1;
+		end
+	end
+	return count;
+end
+
+-- Returns amount of raid members based on class
+function mhb_GetNrOfValidRaidMembersByClass(class, spell)
+	local count = 0;
+	for i = 1, GetNumRaidMembers() do
+		if mhb_GetClass("raid" .. i) == class and mhb_IsValidTarget("raid" .. i, spell) then
+			count = count + 1;
+		end
+	end
+	return count;
+end
+
 -- returns a string in caps of which class unit is of.
 function mhb_GetClass(unit)
 	local _, playerClass = UnitClass(unit);
@@ -35,10 +60,20 @@ function mhb_IsMelee(unit)
 	return not mhb_HasMana(unit);
 end
 
+-- Checks if unit is a healer
+function mhb_IsHealer(unit)
+	local class = mhb_GetClass(unit);
+	if class == "PRIEST" or class == "SHAMAN" or class == "PALADIN" or class == "DRUID" then
+		return true;
+	else
+		return false;
+	end
+end
+
 -- Checks if unit has mana as energy type.
 function mhb_HasMana(unit)
-	local playerClass = mhb_GetClass(unit);
-	if playerClass == "MAGE" or playerClass == "PRIEST" or playerClass == "SHAMAN" or playerClass == "PALADIN" or playerClass == "WARLOCK" or playerClass == "HUNTER" or playerClass == "DRUID" then
+	local class = mhb_GetClass(unit);
+	if class == "MAGE" or class == "PRIEST" or class == "SHAMAN" or class == "PALADIN" or class == "WARLOCK" or class == "HUNTER" or class == "DRUID" then
 		return true;
 	else
 		return false;
@@ -61,7 +96,6 @@ end
 -- All 3 solutions above is lag-prone, test them to see if any of them works.
 function mhb_TargetAndCast(unit, spell)
 	if not mhb_CanCastSpell(spell) then
-		mhb_Print("Spellcast failed due to oom / reagent!");
 		return false;
 	end
 	currentTarget = unit;
@@ -69,10 +103,8 @@ function mhb_TargetAndCast(unit, spell)
 	TargetUnit(currentTarget);
 	CastSpellByName(currentSpell);
 	if mhb_IsOnGCDIn(0) then
-		mhb_Print("Spellcast succeeded!");
 		return true;
 	end
-	mhb_Print("Spellcast failed due to movement!");
 	return false;
 end
 
@@ -284,37 +316,11 @@ function mhb_CanCastSpell(spell)
 	return false;
 end
 
--- Table containting all SPELL's and their MANACOST's
-manaCostTable = {};
--- Uses above table to get the manacost of a spell
-function mhb_HasEnoughManaForSpell(spell)
-	local cost = manaCostTable[spell];
-	if cost then
-		if cost > UnitMana("player") then
-			return false;
-		end	
-		return true;
-	end
-	return true;
+-- returns time left of current cast
+function mhb_GetTimeSinceCastStart()
+	local timeSinceStart = GetTime() - startCastTime;
+	return timeSinceStart;
 end
-
--- Table containing all SPELL's and their REAGENT's
-reagentCastTable = {};
--- Uses above table to get the reagent of a spell
-function mhb_HasEnoughReagentsForSpell(spell)
-	local reagent = reagentCostTable[spell];
-	if reagent then
-		if mhb_GetBagAndSlotForItem(reagent) then
-			return true;
-		end	
-		return false;
-	end
-	return true;
-end
-
-
-
-
 
 
 
