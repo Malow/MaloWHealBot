@@ -5,9 +5,9 @@
 ## Version 1
 ## Author: MaloW
 MaloWHealBot.xml
-MaloWHealBot.lua
 MaloWHealBotPriest.lua
 MaloWHealBotShaman.lua
 MaloWHealBotUtilities.lua
 MaloWLuaUtils.lua
 MaloWHealBotLogic.lua
+MaloWHealBot.lua

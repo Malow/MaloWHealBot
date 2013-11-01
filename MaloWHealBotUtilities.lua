@@ -61,6 +61,7 @@ end
 -- All 3 solutions above is lag-prone, test them to see if any of them works.
 function mhb_TargetAndCast(unit, spell)
 	if not mhb_CanCastSpell(spell) then
+		mhb_Print("Spellcast failed due to oom / reagent!");
 		return false;
 	end
 	currentTarget = unit;
@@ -68,8 +69,10 @@ function mhb_TargetAndCast(unit, spell)
 	TargetUnit(currentTarget);
 	CastSpellByName(currentSpell);
 	if mhb_IsOnGCDIn(0) then
-		return true
+		mhb_Print("Spellcast succeeded!");
+		return true;
 	end
+	mhb_Print("Spellcast failed due to movement!");
 	return false;
 end
 
