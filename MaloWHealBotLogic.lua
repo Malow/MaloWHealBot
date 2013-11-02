@@ -190,7 +190,7 @@ function mhb_GetDispelTarget(spell, dispelType, buff)
 end
 
 -- Returns a table of damaged raid members
-function mhb_GetDamagedTargets(spell, melee, damageReq)
+function mhb_GetDamagedTargets(spell, role, damageReq)
 	local targets = {};
 	members = mhb_GetNumPartyOrRaidMembers();
 	for i = 0, members do 
@@ -198,7 +198,7 @@ function mhb_GetDamagedTargets(spell, melee, damageReq)
 		local missingHealth = mhb_GetMissingHealth(unit); 
 		if mhb_IsValidTarget(unit, spell) then 
 			if missingHealth > damageReq then 
-				if (melee and mhb_IsMelee(unit)) or (not melee and not mhb_IsMelee(unit)) then 
+				if (role == "MELEE" and mhb_IsMelee(unit)) or (role == "RANGED" and mhb_IsRanged(unit)) then 
 					targets[unit] = missingHealth;
 				end
 			end 

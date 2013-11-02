@@ -26,6 +26,8 @@
 -- If drinking buff runs out and still not full mana, char keeps sitting down cuz isDrinking is false... Bool for isDrinking that gets checked / set too? So if that bool is true and buff is gone, set it false, and make 
 --		char stand up?
 --
+-- Take into effect pushback on spells casting times.
+--
 
 
 -- Static Global variables

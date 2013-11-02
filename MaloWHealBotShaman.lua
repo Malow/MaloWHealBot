@@ -36,7 +36,7 @@ HEALVALUE_CHAIN_HEAL_3 = 400;
 HEALVALUE_LESSER_HEALING_WAVE = 1200;
 
 COEF_CHAIN_HEAL = 0.75; -- Percentage of maximum effect that can be estimated to cast it
-MINIMUM_DAMAGE_FOR_CHAIN_HEAL = 200; -- Minimum damage a unit has to have taken for chain heal calc to consider them.
+MINIMUM_DAMAGE_FOR_CHAIN_HEAL = HEALVALUE_CHAIN_HEAL_3 * 0.75; -- Minimum damage a unit has to have taken for chain heal calc to consider them.
 
 BUFF_LIGHTNING_SHIELD = "Interface\\Icons\\Spell_Nature_LightningShield";
 BUFF_MANA_SPRING_TOTEM = "Interface\\Icons\\Spell_Nature_ManaRegenTotem";
@@ -71,8 +71,73 @@ end
 
 -- Calculate chainheal effect
 function mhb_Shaman_GetChainHealEffect()			--------- TODO implement proper
-	local meleeTargets = mhb_GetDamagedTargets(SPELL_CHAIN_HEAL, true, MINIMUM_DAMAGE_FOR_CHAIN_HEAL);
-	local rangedTargets = mhb_GetDamagedTargets(SPELL_CHAIN_HEAL, false, MINIMUM_DAMAGE_FOR_CHAIN_HEAL);
+	local meleeTargets = mhb_GetDamagedTargets(SPELL_CHAIN_HEAL, "MELEE", MINIMUM_DAMAGE_FOR_CHAIN_HEAL);
+	local rangedTargets = mhb_GetDamagedTargets(SPELL_CHAIN_HEAL, "RANGED", MINIMUM_DAMAGE_FOR_CHAIN_HEAL);
+	
+	
+	-- FIRST OFF, see if overall enough people in the group is damaged, if so then cast.
+	-- without modifier
+	-- 2.5 if 5 man
+	-- 5 if 10 man
+	-- 10 if 20 man
+	-- 20 if 40 man
+	
+	-- with modifier
+	-- 3 if 5 man
+	-- 5 if 10 man
+	-- 8 if 20 man
+	-- 15 if 40 man
+	
+	local numRaidMembers = mhb_GetNumPartyOrRaidMembers();
+	local modifier = 0;
+	
+	if numRaidMembers > 30 then
+		modifier = 5;
+	else if numRaidMembers > 15 then
+		modifier = 2;
+	end
+	
+	local nrMelee = GetTableSize(meleeTargets);
+	local nrRanged = GetTableSize(rangedTargets)
+	local totalDamagedTargets = nrMelee + nrRanged;
+	if totalDamagedTargets >= (numRaidMembers * 0.5) - modifier then
+		local healTargetUnit, missingHealth = mhb_GetMostDamagedTarget(SPELL_HEALING_WAVE);
+		return healTargetUnit, 1;
+	end
+	
+	
+	-- SECOND OFF, check melee dividually and cast specifically on them.
+	if numRaidMembers < 8 then	-- 5man
+		return "none", 0;
+	else if numRaidMembers < 15 then -- 10man
+		if nrMelee >= 3 then
+			-- get them sorted
+			local nrOfMeleeLeft, meleeUnits, meleeMissingHealths = KeepXHighestValuePairs(meleeTargets, 1);
+			if meleeMissingHealths[0] > HEALVALUE_CHAIN_HEAL_1 then
+				return meleeUnits[0], 1;
+			end
+			-- TODO, else downrank chain heal.
+		end	
+	else if numRaidMembers < 30 then -- 20man
+		if nrMelee >= 4 then
+			-- get them sorted
+			local nrOfMeleeLeft, meleeUnits, meleeMissingHealths = KeepXHighestValuePairs(meleeTargets, 1);
+			if meleeMissingHealths[0] > HEALVALUE_CHAIN_HEAL_1 then
+				return meleeUnits[0], 1;
+			end
+			-- TODO, else downrank chain heal.
+		end	
+	else -- 40 man
+		if nrMelee >= 6 then
+			-- get them sorted
+			local nrOfMeleeLeft, meleeUnits, meleeMissingHealths = KeepXHighestValuePairs(meleeTargets, 1);
+			if meleeMissingHealths[0] > HEALVALUE_CHAIN_HEAL_1 then
+				return meleeUnits[0], 1;
+			end
+			-- TODO, else downrank chain heal.
+		end	
+	end
+	
 	
 	-- local nrOfMelee, meleeUnits, meleeMissingHealths = KeepXHighestValuePairs(meleeTargets, 3);
 	-- local nrOfRanged, rangedUnits, rangedMissingHealths = KeepXHighestValuePairs(rangedTargets, 3);
@@ -85,11 +150,11 @@ function mhb_Shaman_GetChainHealEffect()			--------- TODO implement proper
 	
 	
 	-- HAX FIX
-	local tot = GetTableSize(meleeTargets) + GetTableSize(rangedTargets);
-	if tot > 4 then 
-		local healTargetUnit, missingHealth = mhb_GetMostDamagedTarget(SPELL_HEALING_WAVE);
-		return healTargetUnit, 5;
-	end
+	-- local tot = GetTableSize(meleeTargets) + GetTableSize(rangedTargets);
+	-- if tot > 4 then 
+	-- 	local healTargetUnit, missingHealth = mhb_GetMostDamagedTarget(SPELL_HEALING_WAVE);
+	-- 	return healTargetUnit, 5;
+	-- end
 
 	return "player", 0;
 end

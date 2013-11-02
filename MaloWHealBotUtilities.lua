@@ -55,6 +55,11 @@ function mhb_GetClass(unit)
 	return playerClass;
 end
 
+-- 
+function mhb_IsRanged(unit)
+	return not mhb_IsMelee(unit);
+end
+
 -- Checks if unit is a melee character.
 function mhb_IsMelee(unit)
 	return not mhb_HasMana(unit);
