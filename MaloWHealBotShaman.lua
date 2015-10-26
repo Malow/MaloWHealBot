@@ -93,12 +93,12 @@ function mhb_Shaman_GetChainHealEffect()			--------- TODO implement proper
 	
 	if numRaidMembers > 30 then
 		modifier = 5;
-	else if numRaidMembers > 15 then
+	elseif numRaidMembers > 15 then
 		modifier = 2;
 	end
 	
 	local nrMelee = GetTableSize(meleeTargets);
-	local nrRanged = GetTableSize(rangedTargets)
+	local nrRanged = GetTableSize(rangedTargets);
 	local totalDamagedTargets = nrMelee + nrRanged;
 	if totalDamagedTargets >= (numRaidMembers * 0.5) - modifier then
 		local healTargetUnit, missingHealth = mhb_GetMostDamagedTarget(SPELL_HEALING_WAVE);
@@ -109,7 +109,7 @@ function mhb_Shaman_GetChainHealEffect()			--------- TODO implement proper
 	-- SECOND OFF, check melee dividually and cast specifically on them.
 	if numRaidMembers < 8 then	-- 5man
 		return "none", 0;
-	else if numRaidMembers < 15 then -- 10man
+	elseif numRaidMembers < 15 then -- 10man
 		if nrMelee >= 3 then
 			-- get them sorted
 			local nrOfMeleeLeft, meleeUnits, meleeMissingHealths = KeepXHighestValuePairs(meleeTargets, 1);
@@ -118,7 +118,7 @@ function mhb_Shaman_GetChainHealEffect()			--------- TODO implement proper
 			end
 			-- TODO, else downrank chain heal.
 		end	
-	else if numRaidMembers < 30 then -- 20man
+	elseif numRaidMembers < 30 then -- 20man
 		if nrMelee >= 4 then
 			-- get them sorted
 			local nrOfMeleeLeft, meleeUnits, meleeMissingHealths = KeepXHighestValuePairs(meleeTargets, 1);

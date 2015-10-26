@@ -78,6 +78,16 @@ function mhb_RemoveBuffsForRebuff()
 					CancelPlayerBuff(i - 1);
 					didAction = true;
 				end
+			elseif b == BUFF_MARK_OF_THE_WILD then
+				if duration < TIME_TEN_MINUTES then
+					CancelPlayerBuff(i - 1);
+					didAction = true;
+				end
+			elseif b == BUFF_THORNS then
+				if duration < TIME_EIGHT_MINUTES then
+					CancelPlayerBuff(i - 1);
+					didAction = true;
+				end
 			end
 		end 
 	end

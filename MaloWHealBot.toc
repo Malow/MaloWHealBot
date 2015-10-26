@@ -7,6 +7,7 @@
 MaloWHealBot.xml
 MaloWHealBotPriest.lua
 MaloWHealBotShaman.lua
+MaloWHealBotDruid.lua
 MaloWHealBotUtilities.lua
 MaloWLuaUtils.lua
 MaloWHealBotLogic.lua

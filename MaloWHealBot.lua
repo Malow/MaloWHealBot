@@ -57,6 +57,8 @@ startCastTime = 0;
 
 -- Main
 SlashCmdList["MHBCOMMAND"] = function(followTarget) 
+	-- Disbale autoself cast to make the mhb_IsSpellInRange checker work.
+	SetCVar("autoSelfCast", 0);
 	if followTarget ~= "" then
 		FollowByName(followTarget, true);
 	end
@@ -65,9 +67,10 @@ SlashCmdList["MHBCOMMAND"] = function(followTarget)
 
 	if playerClass == "PRIEST" then
 		mhb_Priest();
-	end
-	if playerClass == "SHAMAN" then
+	elseif playerClass == "SHAMAN" then
 		mhb_Shaman();
+	elseif playerClass == "DRUID" then
+		mhb_Druid();
 	end
 end 
 SLASH_MHBCOMMAND1 = "/mhb";
@@ -115,16 +118,21 @@ function mhb_AfterLoad()
 		return;
 	end
 	local playerClass = mhb_GetClass("player");
-	mhb_Print("MaloWHealBot loaded for class " .. playerClass);
 	if playerClass == "PRIEST" then
+    mhb_Print("MaloWHealBot loaded for class " .. playerClass);
 		mhb_Priest_Load();
-	end
-	if playerClass == "SHAMAN" then
+	elseif playerClass == "SHAMAN" then
+    mhb_Print("MaloWHealBot loaded for class " .. playerClass);
 		mhb_Shaman_Load();
+	elseif playerClass == "DRUID" then
+    mhb_Print("MaloWHealBot loaded for class " .. playerClass);
+		mhb_Druid_Load();
+  else
+    mhb_Print("MaloWHealBot no module found for class " .. playerClass);
 	end
 	
-	-- Disable autoself cast to make the mhb_IsSpellInRange checker work.
-	SetCVar("autoSelfCast", 0);
+	-- Enable autoself cast, cuz it's annoying to have off, but it's needed to be disabled to make the mhb_IsSpellInRange checker work. Disable it when /mbh is run
+	SetCVar("autoSelfCast", 1);
 	hasLoaded = true;
 end
 
@@ -165,6 +173,9 @@ end
 -- List all buffs and debuffs:
 -- /run for i = 1, 32 do local b = UnitBuff("player", i); if b then ChatFrame1:AddMessage("Buff: " .. b); end local d = UnitDebuff("player", i); if d then ChatFrame1:AddMessage("Debuff: " .. d); end end
 --
+-- List all buffs ids:
+-- /run for i = 1, 32 do local a,b,c,d,e,f,g,h,i,j,k = UnitBuff("player", i); if k then ChatFrame1:AddMessage("Buff: " .. k); end end
+--
 -- List all spells you know and their IDs:
 -- /run for i = 1, 1000 do local s = GetSpellName(i, "BOOKTYPE_SPELL"); if s then ChatFrame1:AddMessage(i .. " - " .. s); end end
 --
@@ -173,12 +184,11 @@ end
 -- 
 -- Print which is your current action:
 -- /run for i = 1, 1000 do if IsCurrentAction(i) then ChatFrame1:AddMessage(i .. " is current action"); end end
+--
 
-
-
-
-
-
+--
+--
+--
 -- tons of macros: http://www.wow-one.com/forum/topic/14546-warrior-tanking-macro-priest-heal-multiboxing-macro/page__hl__%2Bbuff+%2Bduration__fromsearch__1
 
 --/run 

@@ -244,6 +244,19 @@ function mhb_HasBuff(unit, buff)
 	return has;
 end
 
+-- Checks if unit has buff
+function mhb_CancelBuff(unit, buff)
+	for i = 1, MAX_BUFFS do
+		local b = UnitBuff(unit, i);
+		if b and b == buff then
+      local bi, c = GetPlayerBuff(i - 1, "HELPFUL" );
+      CancelPlayerBuff(bi);
+			return true;
+		end
+	end
+	return false;
+end
+
 -- returns the percent of mana of the unit
 function mhb_GetManaPercent(unit)
 	return UnitMana(unit) / UnitManaMax(unit);
